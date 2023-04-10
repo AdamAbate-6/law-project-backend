@@ -37,5 +37,5 @@ pipenv shell
 uvicorn main:app --reload
 ```
 
-### NOTES 
-* Had to update to motor 3.1.1 because of asyncio error with Python 3.11 https://jira.mongodb.org/browse/MOTOR-1054
+### Deployment TODOs
+* Change main.py's frontend URI and database.py's database URI.

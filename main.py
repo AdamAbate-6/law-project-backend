@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sha
 #     update_todo,
 #     remove_todo
 # )
+from database import (fetch_one_project, fetch_one_user)
 
 app = FastAPI()
 
@@ -31,3 +32,17 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {'ping': 'pong'}
+
+@app.get("/api/u{email}")
+def get_user_by_email(email):
+    response = await fetch_one_user(email)
+    if response:
+        return response
+    raise HTTPException(404, f"There is no user with email {email}")
+
+@app.get("/api/p{project_id}")
+def get_project_by_id(project_id):
+    response = await fetch_one_project(project_id)
+    if response:
+        return response
+    raise HTTPException(404, f"There is no project with ID {project_id}")
