@@ -8,7 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sha
 #     update_todo,
 #     remove_todo
 # )
-from database import (fetch_one_project, fetch_one_user)
+from models import User, Project
+from database import (
+    fetch_one_user,
+    fetch_one_project, 
+    create_user,
+    create_project)
+
+
 
 app = FastAPI()
 
@@ -29,20 +36,49 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+def reformat_mongodb_id_field(response: dict) -> dict:
+    """
+    MongoDB ObjectID field cannot be encoded into JSON for transmission back to frontend. Convert to string.
+    :param response: Dictionary containing a MongoDB document.
+    """
+    if '_id' in response:
+        response['_id'] = str(response.pop('_id'))
+    return response
+
+
 @app.get("/")
 def read_root():
     return {'ping': 'pong'}
 
-@app.get("/api/u{email}")
-def get_user_by_email(email):
+
+@app.get("/api/user/{email}")
+async def get_user_by_email(email: str):
     response = await fetch_one_user(email)
     if response:
-        return response
+        return reformat_mongodb_id_field(response)
     raise HTTPException(404, f"There is no user with email {email}")
 
-@app.get("/api/p{project_id}")
-def get_project_by_id(project_id):
+
+@app.get("/api/project/{project_id}")
+async def get_project_by_id(project_id: str):
     response = await fetch_one_project(project_id)
     if response:
-        return response
+        return reformat_mongodb_id_field(response)
     raise HTTPException(404, f"There is no project with ID {project_id}")
+
+
+@app.post("/api/user")
+async def post_user(user_entry: User):
+    response = await create_user(user_entry.dict())
+    if response:
+        return reformat_mongodb_id_field(response)
+    raise HTTPException(400, "Something went wrong / bad request")
+
+
+
+@app.post("/api/project/")
+async def post_project(project_entry: Project):
+    response = await create_project(project_entry.dict())
+    if response:
+        return reformat_mongodb_id_field(response)
+    raise HTTPException(400, "Something went wrong / bad request")
