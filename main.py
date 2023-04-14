@@ -8,12 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sha
 #     update_todo,
 #     remove_todo
 # )
-from models import User, Project
+from models import (
+    User, 
+    Project, 
+    ChatEntry,
+    UserInput)
 from database import (
     fetch_one_user,
     fetch_one_project, 
     create_user,
-    create_project)
+    create_project,
+    modify_project_chat)
 
 
 
@@ -51,7 +56,7 @@ def read_root():
     return {'ping': 'pong'}
 
 
-@app.get("/api/user/{email}")
+@app.get("/api/user/{email}", response_model=User)
 async def get_user_by_email(email: str):
     response = await fetch_one_user(email)
     if response:
@@ -59,7 +64,7 @@ async def get_user_by_email(email: str):
     raise HTTPException(404, f"There is no user with email {email}")
 
 
-@app.get("/api/project/{project_id}")
+@app.get("/api/project/{project_id}", response_model=Project)
 async def get_project_by_id(project_id: str):
     response = await fetch_one_project(project_id)
     if response:
@@ -67,7 +72,7 @@ async def get_project_by_id(project_id: str):
     raise HTTPException(404, f"There is no project with ID {project_id}")
 
 
-@app.post("/api/user")
+@app.post("/api/user", response_model=User)
 async def post_user(user_entry: User):
     response = await create_user(user_entry.dict())
     if response:
@@ -75,10 +80,37 @@ async def post_user(user_entry: User):
     raise HTTPException(400, "Something went wrong / bad request")
 
 
-
-@app.post("/api/project/")
+@app.post("/api/project/", response_model=Project)
 async def post_project(project_entry: Project):
     response = await create_project(project_entry.dict())
     if response:
         return reformat_mongodb_id_field(response)
     raise HTTPException(400, "Something went wrong / bad request")
+
+
+@app.put("/api/project/{project_id}", response_model=Project)
+async def put_project_chat(project_id: str, user_input: UserInput):
+
+    # First, get the project record that needs to be updated.
+    project_entry = await fetch_one_project(project_id)
+    chat = project_entry['chat']
+
+    # Second, get the part of the project chat corresponding to this user.
+    user_id = user_input.user_id
+    user_chat = chat[user_id]
+
+    # Third, put the new message from the user into the user's chat.
+    # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
+    new_chat_msg = {'source': 'user', 'msg': user_input.msg}
+    user_chat.append(new_chat_msg)
+
+    # Fourth, update the dictionary of project chats with the updated user chat.
+    chat[user_id] = user_chat
+
+    # Finally, update the project entry in MongoDB with the new chat.
+    response = await modify_project_chat(project_id, updated_chat=chat)
+
+    if response:
+        return reformat_mongodb_id_field(response)
+    
+    raise HTTPException(400, 'Something went wrong.')

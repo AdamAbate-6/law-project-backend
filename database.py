@@ -2,7 +2,7 @@
 import motor.motor_asyncio
 from bson.objectid import ObjectId
 
-from models import User
+from models import User, ChatEntry
 
 # Connection between database.py and MongoDB
 client = motor.motor_asyncio.AsyncIOMotorClient('mongodb://localhost:27017')
@@ -47,9 +47,26 @@ async def fetch_one_project(project_id: str):
 
 async def create_user(user_entry: dict):
     result = await users_collection.insert_one(user_entry)
-    return user_entry
+    document = await users_collection.find_one({'_id': result.inserted_id})
+    return document
 
 
 async def create_project(project_entry: dict):
     result = await projects_collection.insert_one(project_entry)
-    return project_entry
+    document = await projects_collection.find_one({'_id': result.inserted_id})
+    return document
+
+
+async def modify_project_chat(project_id: str, updated_chat: dict[str, list[ChatEntry]]):
+    """
+    updated_chat is a dictionary with as many entries as users on the project. Each key is a user ID. Each value is a list of Chat messages between that user and the AI.
+    """
+    await projects_collection.update_one(
+        {'_id': ObjectId(project_id)},
+        {'$set': {
+            'chat': updated_chat
+            }
+        }
+    )
+    document = await projects_collection.find_one({'_id': ObjectId(project_id)})
+    return document
