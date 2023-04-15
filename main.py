@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from typing import Annotated
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sharing
 
 # from database import (
@@ -40,6 +42,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+USER_ID_QUERY = Query(max_length=24, min_length=24, regex='^[a-z0-9]+$', description='_id field of entry in `projects` collection of MongoDB')
+PROJECT_ID_QUERY = Query(max_length=24, min_length=24, regex='^[a-z0-9]+$', description='_id field of entry in `users` collection of MongoDB')
 
 def reformat_mongodb_id_field(response: dict) -> dict:
     """
@@ -114,3 +119,9 @@ async def put_project_chat(project_id: str, user_input: UserInput):
         return reformat_mongodb_id_field(response)
     
     raise HTTPException(400, 'Something went wrong.')
+
+
+@app.get("/api/ai")
+def get_ai_response(project_id: Annotated[str, PROJECT_ID_QUERY], 
+                    user_id: Annotated[str, USER_ID_QUERY]):
+    return 'hello'
