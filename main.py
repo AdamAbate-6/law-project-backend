@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sha
 from models import (
     User, 
     Project, 
-    ChatEntry,
-    UserInput)
+    UserInput,
+    AiResponse)
 from database import (
     fetch_one_user,
     fetch_one_project, 
@@ -121,7 +121,29 @@ async def put_project_chat(project_id: str, user_input: UserInput):
     raise HTTPException(400, 'Something went wrong.')
 
 
-@app.get("/api/ai")
-def get_ai_response(project_id: Annotated[str, PROJECT_ID_QUERY], 
-                    user_id: Annotated[str, USER_ID_QUERY]):
-    return 'hello'
+@app.get("/api/ai", response_model=AiResponse)
+async def get_ai_response(project_id: Annotated[str, PROJECT_ID_QUERY], 
+                          user_id: Annotated[str, USER_ID_QUERY]):
+
+    # Get the chat (list of dicts with 'source' and 'msg' keys) for this project and user.
+    project_entry = await fetch_one_project(project_id)
+    chat = project_entry['chat']
+    user_chat = chat[user_id]
+
+    # TODO generate AI response based on the above.
+    ai_msg = 'This is a test AI response!'
+
+    # Put the AI-generated message in the user_chat list, and then make that updated list 
+    #  the entry for this user in the project. Update the DB accordingly.
+    # Yes, I know, this is a GET endpoint, but I am ok updating the DB in it because in 
+    #  PUT and POST typically imply the client is sending data to the backend. Here the
+    #  backend (i.e. the AI) is the one generating the data.
+    new_chat_msg = {'source': 'ai', 'msg': ai_msg}
+    user_chat.append(new_chat_msg)
+    chat[user_id] = user_chat
+    response = await modify_project_chat(project_id, updated_chat=chat)
+    if not response:
+        raise HTTPException(400, 'Something went wrong.')
+
+    data = AiResponse.parse_obj({'msg': ai_msg})
+    return data

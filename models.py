@@ -16,14 +16,6 @@ class ChatEntry(BaseModel):
     msg: str
 
 
-class UserInput(BaseModel):
-    """
-    This comes from the UI and so has to specify the user in addition to message contents.
-    """
-    user_id: str
-    msg: str
-
-
 class Project(BaseModel):
     # _id will be populated if object of Project class is being returned from MongoDB; if the object is being posted, _id should not exist as it will be generated automatically by MongoDB.
     _id: str | None = None
@@ -32,3 +24,19 @@ class Project(BaseModel):
     chat: dict[str, list[ChatEntry]]
     user_ids: list[str]
     document_ids: list[str]
+
+
+class UserInput(BaseModel):
+    """
+    This comes from the UI and so has to specify the user in addition to message contents.
+    """
+    user_id: str
+    msg: str
+
+
+class AiResponse(BaseModel):
+    """
+    This is the object FastAPI returns from a /api/ai GET.
+    Eventually may add other fields containing links to referenced documents.
+    """
+    msg: str
