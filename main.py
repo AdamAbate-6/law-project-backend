@@ -11,8 +11,11 @@ from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sha
 #     remove_todo
 # )
 from models import (
-    User, 
-    Project, 
+    UserDataFromClient,
+    UserDataToClient, 
+    UserDataEditsFromClient,
+    ProjectDataFromClient,
+    ProjectDataToClient, 
     UserInput,
     AiResponse)
 from database import (
@@ -20,7 +23,9 @@ from database import (
     fetch_one_project, 
     create_user,
     create_project,
-    modify_project_chat)
+    modify_user,
+    modify_project_chat,
+    modify_project_patents)
 
 
 
@@ -52,16 +57,19 @@ def reformat_mongodb_id_field(response: dict) -> dict:
     :param response: Dictionary containing a MongoDB document.
     """
     if '_id' in response:
-        response['_id'] = str(response.pop('_id'))
+        # For _id field of MongoDB entry...
+        # 1) Have to convert _id field from bson.ObjectId to string.
+        # 2) Have to put into differently named field. _id is not returned to the client if response_model is a BaseModel (as opposed to returning a dict).
+        response['mongo_id'] = str(response.pop('_id'))
     return response
 
-
+# ==========================================================
 @app.get("/")
 def read_root():
     return {'ping': 'pong'}
 
 
-@app.get("/api/user/{email}", response_model=User)
+@app.get("/api/user/{email}", response_model=UserDataToClient)
 async def get_user_by_email(email: str):
     response = await fetch_one_user(email)
     if response:
@@ -69,51 +77,37 @@ async def get_user_by_email(email: str):
     raise HTTPException(404, f"There is no user with email {email}")
 
 
-@app.get("/api/project/{project_id}", response_model=Project)
+@app.get("/api/project/{project_id}", response_model=ProjectDataToClient)
 async def get_project_by_id(project_id: str):
     response = await fetch_one_project(project_id)
     if response:
         return reformat_mongodb_id_field(response)
     raise HTTPException(404, f"There is no project with ID {project_id}")
 
+# ==========================================================
 
-@app.post("/api/user", response_model=User)
-async def post_user(user_entry: User):
+@app.post("/api/user", response_model=UserDataToClient)
+async def post_user(user_entry: UserDataFromClient):
     response = await create_user(user_entry.dict())
     if response:
         return reformat_mongodb_id_field(response)
     raise HTTPException(400, "Something went wrong / bad request")
 
 
-@app.post("/api/project/", response_model=Project)
-async def post_project(project_entry: Project):
+@app.post("/api/project/", response_model=ProjectDataToClient)
+async def post_project(project_entry: ProjectDataFromClient):
     response = await create_project(project_entry.dict())
     if response:
         return reformat_mongodb_id_field(response)
     raise HTTPException(400, "Something went wrong / bad request")
 
+# ==========================================================
 
-@app.put("/api/project/{project_id}", response_model=Project)
-async def put_project_chat(project_id: str, user_input: UserInput):
+@app.put("/api/user/{user_id}", response_model=UserDataToClient)
+async def put_user_modifications(user_id: str, user_entry: UserDataEditsFromClient):
 
-    # First, get the project record that needs to be updated.
-    project_entry = await fetch_one_project(project_id)
-    chat = project_entry['chat']
-
-    # Second, get the part of the project chat corresponding to this user.
-    user_id = user_input.user_id
-    user_chat = chat[user_id]
-
-    # Third, put the new message from the user into the user's chat.
-    # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
-    new_chat_msg = {'source': 'user', 'msg': user_input.msg}
-    user_chat.append(new_chat_msg)
-
-    # Fourth, update the dictionary of project chats with the updated user chat.
-    chat[user_id] = user_chat
-
-    # Finally, update the project entry in MongoDB with the new chat.
-    response = await modify_project_chat(project_id, updated_chat=chat)
+    user_edits = {k: v for k, v in user_entry.dict().items() if v is not None}
+    response = await modify_user(user_id, updated_user=user_edits)
 
     if response:
         return reformat_mongodb_id_field(response)
@@ -121,6 +115,65 @@ async def put_project_chat(project_id: str, user_input: UserInput):
     raise HTTPException(400, 'Something went wrong.')
 
 
+@app.put("/api/project/{project_id}", response_model=ProjectDataToClient)
+async def put_project_modifications(project_id: str, user_input: UserInput):
+
+    # Get the project record that needs to be updated.
+    project_entry = await fetch_one_project(project_id)
+
+    # Check whether chat should be updated with contents of user_input.
+    if user_input.msg is not None:
+
+        # First, get the part of the project chat corresponding to this user.
+        user_id = user_input.user_id
+        chat = project_entry['chat']
+        user_chat = chat[user_id]
+
+        # Second, put the new message from the user into the user's chat.
+        # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
+        new_chat_msg = {'source': 'user', 'msg': user_input.msg}
+        user_chat.append(new_chat_msg)
+
+        # Third, update the dictionary of project chats with the updated user chat.
+        chat[user_id] = user_chat
+
+        # Finally, update the project entry in MongoDB with the new chat.
+        response1 = await modify_project_chat(project_id, updated_chat=chat)
+
+    if user_input.patent_number is not None and user_input.patent_office is not None:
+        
+        # First, get the part of the project patents corresponding to this user.
+        user_id = user_input.user_id
+        patents = project_entry['patents']
+        user_patents = patents[user_id]
+
+        # Second, put the new patent from the user input into the user's list of patents.
+        # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
+        new_patent = {'office': user_input.patent_office, 'number': user_input.patent_number}
+        user_patents.append(new_patent)
+
+        # Third, update the dictionary of project patents with the updated user patent list.
+        patents[user_id] = user_patents
+
+        # Finally, update the project entry in MongoDB with the new patent list.
+        response2 = await modify_project_patents(project_id, updated_patents=patents)
+
+    response = None
+    if response1 and response2:  # Both chat and patents were modified, so only trust return of latter since executed second.
+        response = response2
+
+    elif response1:
+        response = response1
+
+    elif response2:
+        response = response2
+
+    if response:
+        return reformat_mongodb_id_field(response)
+    
+    raise HTTPException(400, 'Something went wrong.')
+
+# ==========================================================
 @app.get("/api/ai", response_model=AiResponse)
 async def get_ai_response(project_id: Annotated[str, PROJECT_ID_QUERY], 
                           user_id: Annotated[str, USER_ID_QUERY]):

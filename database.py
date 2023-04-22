@@ -2,7 +2,7 @@
 import motor.motor_asyncio
 from bson.objectid import ObjectId
 
-from models import User, ChatEntry
+from models import ChatEntry, PatentEntry
 
 # Connection between database.py and MongoDB
 client = motor.motor_asyncio.AsyncIOMotorClient('mongodb://localhost:27017')
@@ -51,6 +51,22 @@ async def create_user(user_entry: dict):
     return document
 
 
+async def modify_user(user_id: str, updated_user: dict):
+    """Update the user entry with _id == user_id with the contents of updated_user
+
+    Args:
+        user_id (str): String representation of ObjectId for MongoDB user entry
+        updated_user (dict): Dict whose keys are fields to be modified and whose values are the new field entries. Values should NOT be Nones.
+    """
+    await users_collection.update_one(
+        {'_id': ObjectId(user_id)},
+        {'$set': updated_user
+        }
+    )
+    document = await users_collection.find_one({'_id': ObjectId(user_id)})
+    return document
+
+
 async def create_project(project_entry: dict):
     result = await projects_collection.insert_one(project_entry)
     document = await projects_collection.find_one({'_id': result.inserted_id})
@@ -65,6 +81,19 @@ async def modify_project_chat(project_id: str, updated_chat: dict[str, list[Chat
         {'_id': ObjectId(project_id)},
         {'$set': {
             'chat': updated_chat
+            }
+        }
+    )
+    document = await projects_collection.find_one({'_id': ObjectId(project_id)})
+    return document
+
+
+async def modify_project_patents(project_id: str, updated_patents: dict[str, list[PatentEntry]]):
+
+    await projects_collection.update_one(
+        {'_id': ObjectId(project_id)},
+        {'$set': {
+            'patents': updated_patents
             }
         }
     )

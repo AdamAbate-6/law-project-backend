@@ -7,6 +7,11 @@ name = "pypi"
 fastapi = "*"
 uvicorn = "*"
 motor = "*"
+langchain = {extras = ["llms"], version = "*"}
+jupyterlab = "*"
+pypdf = "*"
+tiktoken = "*"
+faiss-cpu = "*"
 
 [dev-packages]
 
