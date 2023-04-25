@@ -12,6 +12,7 @@ jupyterlab = "*"
 pypdf = "*"
 tiktoken = "*"
 faiss-cpu = "*"
+google-cloud-bigquery = "*"
 
 [dev-packages]
 

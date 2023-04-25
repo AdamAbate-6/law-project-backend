@@ -3,13 +3,7 @@ from typing import Annotated
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sharing
 
-# from database import (
-#     fetch_one_todo,
-#     fetch_all_todos,
-#     create_todo,
-#     update_todo,
-#     remove_todo
-# )
+
 from models import (
     UserDataFromClient,
     UserDataToClient, 
@@ -35,7 +29,7 @@ app = FastAPI()
 # Allow resource sharing between React (running on port 3000) and FastAPI (running on some different port)
 # NOTE: If you don't get the origins *exactly right* (e.g. if you make it https when it is supposed to be http),
 #  you will see errors like this in browser debugging tools: 
-#      Access to XMLHttpRequest at 'http://localhost:8000/api/todo' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+#      Access to XMLHttpRequest at 'http://localhost:8000/api/user' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
 # And in the uvicorn backend terminal you'll see preflight requests of type OPTIONS get rejected with a 400 bad request
 #  every time you try to add or delete an item. You'll also not see anything but an empty item because todoList in App.js will be empty.
 
@@ -122,6 +116,7 @@ async def put_project_modifications(project_id: str, user_input: UserInput):
     project_entry = await fetch_one_project(project_id)
 
     # Check whether chat should be updated with contents of user_input.
+    response1 = None
     if user_input.msg is not None:
 
         # First, get the part of the project chat corresponding to this user.
@@ -140,6 +135,7 @@ async def put_project_modifications(project_id: str, user_input: UserInput):
         # Finally, update the project entry in MongoDB with the new chat.
         response1 = await modify_project_chat(project_id, updated_chat=chat)
 
+    response2 = None
     if user_input.patent_number is not None and user_input.patent_office is not None:
         
         # First, get the part of the project patents corresponding to this user.
@@ -159,7 +155,7 @@ async def put_project_modifications(project_id: str, user_input: UserInput):
         response2 = await modify_project_patents(project_id, updated_patents=patents)
 
     response = None
-    if response1 and response2:  # Both chat and patents were modified, so only trust return of latter since executed second.
+    if response1 and response2:  # Both chat and patents were modified, so only trust return of latter since it was executed second.
         response = response2
 
     elif response1:
