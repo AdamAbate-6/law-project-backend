@@ -69,6 +69,11 @@ class ProjectDataToClient(BaseModel):
 
 # ==========================================================
 
+class PatentDataToClient(BaseModel):
+    mongo_id: str
+
+# ==========================================================
+
 class UserInput(BaseModel):
     """
     This comes from the UI and so has to specify the user in addition to message contents or patent info.

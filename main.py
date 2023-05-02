@@ -10,6 +10,7 @@ from models import (
     UserDataEditsFromClient,
     ProjectDataFromClient,
     ProjectDataToClient, 
+    PatentDataToClient,
     UserInput,
     AiResponse)
 from database import (
@@ -17,9 +18,11 @@ from database import (
     fetch_one_project, 
     create_user,
     create_project,
+    create_patent,
     modify_user,
     modify_project_chat,
     modify_project_patents)
+from big_query_utils import query_patent
 
 
 
@@ -94,6 +97,21 @@ async def post_project(project_entry: ProjectDataFromClient):
     if response:
         return reformat_mongodb_id_field(response)
     raise HTTPException(400, "Something went wrong / bad request")
+
+@app.post("/api/patent/{patent_spif}", response_model=PatentDataToClient)
+async def post_patent(patent_spif: str):
+    # First, see if patent already exists in DB.
+    response = await fetch_one_patent(patent_spif)
+    if response:
+        return reformat_mongodb_id_field(response)
+    else:
+        # Patent doesn't exist, so query BigQuery for it.
+        patent_data = query_patent(patent_spif)
+        response = await create_patent(patent_data)
+        if response:
+            return reformat_mongodb_id_field(response)
+        raise HTTPException(400, "Something went wrong during patent creation in DB / bad request")
+        
 
 # ==========================================================
 

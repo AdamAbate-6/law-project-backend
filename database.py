@@ -11,6 +11,7 @@ database = client.law
 # A collection is analogous to a SQL table.
 users_collection = database.users
 projects_collection = database.projects
+patents_collection = database.patents
 documents_collection = database.documents
 # 4/9/2023 thoughts on schema design:
 # law
@@ -45,9 +46,20 @@ async def fetch_one_project(project_id: str):
     return document
 
 
+async def fetch_one_patent(patent_spif: str):
+    document = await patents_collection.find_one({'spif': patent_spif})
+    return document
+
+
 async def create_user(user_entry: dict):
     result = await users_collection.insert_one(user_entry)
     document = await users_collection.find_one({'_id': result.inserted_id})
+    return document
+
+
+async def create_patent(patent_data: dict):
+    result = await patents_collection.insert_one(patent_data)
+    document = await patents_collection.find_one({'_id': result.inserted_id})
     return document
 
 
