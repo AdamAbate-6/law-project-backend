@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware  # Cross origin resources sharing
 
 
@@ -16,6 +16,7 @@ from models import (
 from database import (
     fetch_one_user,
     fetch_one_project, 
+    fetch_one_patent,
     create_user,
     create_project,
     create_patent,
@@ -68,48 +69,50 @@ def read_root():
 
 @app.get("/api/user/{email}", response_model=UserDataToClient)
 async def get_user_by_email(email: str):
-    response = await fetch_one_user(email)
-    if response:
-        return reformat_mongodb_id_field(response)
+    db_response = await fetch_one_user(email)
+    if db_response:
+        return reformat_mongodb_id_field(db_response)
     raise HTTPException(404, f"There is no user with email {email}")
 
 
 @app.get("/api/project/{project_id}", response_model=ProjectDataToClient)
 async def get_project_by_id(project_id: str):
-    response = await fetch_one_project(project_id)
-    if response:
-        return reformat_mongodb_id_field(response)
+    db_response = await fetch_one_project(project_id)
+    if db_response:
+        return reformat_mongodb_id_field(db_response)
     raise HTTPException(404, f"There is no project with ID {project_id}")
 
 # ==========================================================
 
-@app.post("/api/user", response_model=UserDataToClient)
+@app.post("/api/user", response_model=UserDataToClient, status_code=status.HTTP_201_CREATED)
 async def post_user(user_entry: UserDataFromClient):
-    response = await create_user(user_entry.dict())
-    if response:
-        return reformat_mongodb_id_field(response)
+    db_response = await create_user(user_entry.dict())
+    if db_response:
+        return reformat_mongodb_id_field(db_response)
     raise HTTPException(400, "Something went wrong / bad request")
 
 
-@app.post("/api/project/", response_model=ProjectDataToClient)
+@app.post("/api/project/", response_model=ProjectDataToClient, status_code=status.HTTP_201_CREATED)
 async def post_project(project_entry: ProjectDataFromClient):
-    response = await create_project(project_entry.dict())
-    if response:
-        return reformat_mongodb_id_field(response)
+    db_response = await create_project(project_entry.dict())
+    if db_response:
+        return reformat_mongodb_id_field(db_response)
     raise HTTPException(400, "Something went wrong / bad request")
 
 @app.post("/api/patent/{patent_spif}", response_model=PatentDataToClient)
-async def post_patent(patent_spif: str):
+async def post_patent(patent_spif: str, api_response: Response):
     # First, see if patent already exists in DB.
-    response = await fetch_one_patent(patent_spif)
-    if response:
-        return reformat_mongodb_id_field(response)
+    db_response = await fetch_one_patent(patent_spif)
+    if db_response:
+        api_response.status_code = status.HTTP_200_OK
+        return reformat_mongodb_id_field(db_response)
     else:
         # Patent doesn't exist, so query BigQuery for it.
         patent_data = query_patent(patent_spif)
-        response = await create_patent(patent_data)
-        if response:
-            return reformat_mongodb_id_field(response)
+        db_response = await create_patent(patent_data)
+        if db_response:
+            api_response.status_code = status.HTTP_201_CREATED
+            return reformat_mongodb_id_field(db_response)
         raise HTTPException(400, "Something went wrong during patent creation in DB / bad request")
         
 
@@ -124,7 +127,7 @@ async def put_user_modifications(user_id: str, user_entry: UserDataEditsFromClie
     if response:
         return reformat_mongodb_id_field(response)
     
-    raise HTTPException(400, 'Something went wrong.')
+    raise HTTPException(400, f'Something went wrong modifying user {user_id}.')
 
 
 @app.put("/api/project/{project_id}", response_model=ProjectDataToClient)
@@ -164,13 +167,22 @@ async def put_project_modifications(project_id: str, user_input: UserInput):
         # Second, put the new patent from the user input into the user's list of patents.
         # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
         new_patent = {'office': user_input.patent_office, 'number': user_input.patent_number}
-        user_patents.append(new_patent)
 
-        # Third, update the dictionary of project patents with the updated user patent list.
-        patents[user_id] = user_patents
+        # Check if patent already exists in user's list of patents.
+        patent_exists = any([p == new_patent for p in user_patents])
+        if patent_exists:
+            # It exists, so just return project data without modifications.
+            response2 = project_entry 
 
-        # Finally, update the project entry in MongoDB with the new patent list.
-        response2 = await modify_project_patents(project_id, updated_patents=patents)
+        else:
+            # Patent not in user's list of patents within project, so put it there. 
+            user_patents.append(new_patent)
+
+            # Third, update the dictionary of project patents with the updated user patent list.
+            patents[user_id] = user_patents
+
+            # Finally, update the project entry in MongoDB with the new patent list.
+            response2 = await modify_project_patents(project_id, updated_patents=patents)
 
     response = None
     if response1 and response2:  # Both chat and patents were modified, so only trust return of latter since it was executed second.

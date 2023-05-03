@@ -4,10 +4,11 @@ from google.cloud import bigquery
 
 def query_patent(patent_spif: str) -> dict:
 
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '../law-project-service-account.json'
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './law-project-service-account.json'
     client = bigquery.Client()
 
     # Perform a query. Need to UNNEST the struct of string arrays in several fields.
+    # TODO Validate query so we don't get an injection attack.
     QUERY = (
         f'SELECT spif_publication_number as spif, t.text as title,  a.text as abstract, c.text as claims '
         f'FROM `patents-public-data.patents.publications`, UNNEST(title_localized) as t, UNNEST(abstract_localized) as a,  UNNEST(claims_localized) as c '
@@ -30,3 +31,5 @@ def query_patent(patent_spif: str) -> dict:
 
         num_iters += 1
         assert num_iters == 1, f'More than one entry was returned from BigQuery query to patent SPIF {patent_spif}; that cannot be correct.'
+    
+    return patent_data
