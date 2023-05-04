@@ -24,6 +24,9 @@ from database import (
     modify_project_chat,
     modify_project_patents)
 from big_query_utils import query_patent
+from llm_utils import (
+    construct_ai_prompt, 
+    generate_ai_response)
 
 
 
@@ -209,8 +212,15 @@ async def get_ai_response(project_id: Annotated[str, PROJECT_ID_QUERY],
     chat = project_entry['chat']
     user_chat = chat[user_id]
 
+    # Get the patent (TODO design prompt to allow more than one patent and then fetch all patents whose metadata is in project_entry['patents'][user_id]).
+    patent_metadata = project_entry['patents'][user_id][0]
+    patent_spif = patent_metadata['office'] + patent_metadata['number']
+    patent = await fetch_one_patent(patent_spif)
+
     # TODO generate AI response based on the above.
-    ai_msg = 'This is a test AI response!'
+    # ai_msg = 'This is a test AI response!'
+    prompt = construct_ai_prompt(user_chat, patent)
+    ai_msg = generate_ai_response(prompt)
 
     # Put the AI-generated message in the user_chat list, and then make that updated list 
     #  the entry for this user in the project. Update the DB accordingly.

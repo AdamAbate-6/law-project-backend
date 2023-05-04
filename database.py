@@ -36,34 +36,34 @@ documents_collection = database.documents
 # users and projects are many-to-many. One user can have many projects, and a project can be shared amongst users.
 # projects and documents are also many-to-many. One project can have many documents, and some documents might be used by multiple projects.
 
-async def fetch_one_user(email: str):
+async def fetch_one_user(email: str) -> dict:
     document = await users_collection.find_one({'email_address': email})
     return document
 
 
-async def fetch_one_project(project_id: str):
+async def fetch_one_project(project_id: str) -> dict:
     document = await projects_collection.find_one({'_id': ObjectId(project_id)})
     return document
 
 
-async def fetch_one_patent(patent_spif: str):
+async def fetch_one_patent(patent_spif: str) -> dict:
     document = await patents_collection.find_one({'spif': patent_spif})
     return document
 
 
-async def create_user(user_entry: dict):
+async def create_user(user_entry: dict) -> dict:
     result = await users_collection.insert_one(user_entry)
     document = await users_collection.find_one({'_id': result.inserted_id})
     return document
 
 
-async def create_patent(patent_data: dict):
+async def create_patent(patent_data: dict) -> dict:
     result = await patents_collection.insert_one(patent_data)
     document = await patents_collection.find_one({'_id': result.inserted_id})
     return document
 
 
-async def modify_user(user_id: str, updated_user: dict):
+async def modify_user(user_id: str, updated_user: dict) -> dict:
     """Update the user entry with _id == user_id with the contents of updated_user
 
     Args:
@@ -79,13 +79,13 @@ async def modify_user(user_id: str, updated_user: dict):
     return document
 
 
-async def create_project(project_entry: dict):
+async def create_project(project_entry: dict) -> dict:
     result = await projects_collection.insert_one(project_entry)
     document = await projects_collection.find_one({'_id': result.inserted_id})
     return document
 
 
-async def modify_project_chat(project_id: str, updated_chat: dict[str, list[ChatEntry]]):
+async def modify_project_chat(project_id: str, updated_chat: dict[str, list[ChatEntry]]) -> dict:
     """
     updated_chat is a dictionary with as many entries as users on the project. Each key is a user ID. Each value is a list of Chat messages between that user and the AI.
     """
@@ -100,7 +100,7 @@ async def modify_project_chat(project_id: str, updated_chat: dict[str, list[Chat
     return document
 
 
-async def modify_project_patents(project_id: str, updated_patents: dict[str, list[PatentEntry]]):
+async def modify_project_patents(project_id: str, updated_patents: dict[str, list[PatentEntry]]) -> dict:
 
     await projects_collection.update_one(
         {'_id': ObjectId(project_id)},
