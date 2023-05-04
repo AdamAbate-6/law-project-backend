@@ -1,3 +1,6 @@
+import json
+import re
+
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts.chat import (
     ChatPromptTemplate,
@@ -10,7 +13,7 @@ from langchain.schema import (
     HumanMessage,
     SystemMessage
 )
-import json
+
 
 def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> str:
 
@@ -64,7 +67,8 @@ def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> str:
         f'Attempting to construct an AI prompt when last message was from `{question["source"]}`. Needs to be from `user`.'
     question_txt = question['msg']
 
-# TODO Define unique_word_lists
+    unique_word_lists = get_unique_words_per_indep_claim(patent['claims'])
+
     # Get a chat completion from the formatted messages.
     # Both page_content and 'source' key of metadata are injected into prompt in document QA. Formatting still unclear. For now just passing page_content because only have single doc.
     chat_prompt = chat_prompt_template.format_prompt(question=question_txt, 
@@ -74,4 +78,84 @@ def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> str:
 
 
 def generate_ai_response(prompt: str) -> str:
+    # TODO
     chat = ChatOpenAI(temperature=0, openai_api_key=openai_api_key)
+    return chat(prompt)
+
+
+def get_unique_words_per_indep_claim(claims: str) -> dict[str, list[str]]:
+    """Identify the independent claims and get the word sets unique to each independent claim and its dependent claims.
+
+    Args:
+        claims (str): String of claims; it is assumed that claims are separated by three triple underscores.
+
+    Returns:
+        dict[str, list[str]]: Dictionary whose keys are independent claim numbers and whose values are the words 
+    unique to each independent claim and its dependent claims 
+    """
+
+    claims_list = claims.split('\n     \n     \n       ')
+
+    # Identify which entries of claims_list are independent claims.
+    dep_claim_pattern = 'of\s+claim'
+    indep_claims = [c for c in claims_list if re.search(dep_claim_pattern, c) is None]
+    indep_claim_indices = [i for i, c in enumerate(claims_list) if re.search(dep_claim_pattern, c) is None]
+
+    # Make a dictionary whose keys are independent claim numbers and whose values are the 1) the text of those independent claims,
+    #  and 2) the text of all dependent claims of each independent claim.
+    indep_claims_and_their_dependents = dict()
+    for i, c in enumerate(claims_list):
+        if i in indep_claim_indices:
+            # Is independent, so start an entry in indep_claims_and_their_dependents.
+            # First numeric appearing in claim should be the claim number.
+            claim_num = re.search('\d+', c).group()
+            assert claim_num is not None, 'Could not find independent claim number.'
+            indep_claims_and_their_dependents[claim_num] = c
+        else:
+            # Is dependent, so group to most recent independent claim since that is what dependent claim refers to.
+            processed_indep_claim_indices = list(indep_claims_and_their_dependents.keys())
+            processed_indep_claim_indices.sort()
+            latest_indep_claim_index = processed_indep_claim_indices[-1]
+            indep_claims_and_their_dependents[latest_indep_claim_index] = indep_claims_and_their_dependents[latest_indep_claim_index] + c
+
+    # Get set of unique words for each independent claim and its dependent claims.
+    word_sets = {ic_num: get_word_set(claims_text) for ic_num, claims_text in indep_claims_and_their_dependents.items()}
+
+    # For each independent claim and its dependents, get list of words that appears only in them.
+    unique_word_lists = dict()
+    for ic_num, word_set in word_sets.items():
+        unique_words = word_set
+        for other_ic_num, other_word_set in word_sets.items():
+            if ic_num == other_ic_num:
+                continue
+            unique_words = unique_words - other_word_set
+        unique_word_lists[ic_num] = list(unique_words)
+
+    return unique_word_lists
+
+
+def get_word_set(multi_word_string: str) -> set:
+    """Split a string into lower cased words with numerics not included and remove punctuation. Then return only the unique words.
+
+    Args:
+        multi_word_string (str): What it sounds like
+
+    Returns:
+        set: Set of unique un-punctuated words
+    """
+    # Assume words are split by spaces.
+    words = multi_word_string.split(' ')
+
+    # Remove punctuation and new-lines.
+    def remove_chars(word: str, chars_to_remove: list):
+        for char in chars_to_remove:
+            word = word.replace(char, '')
+        return word
+    
+    words = [remove_chars(word, ['.', ';', ',', '(', ')', ':', '\n']) for word in words]
+
+    # Get rid of any length-0 or length-1 words (e.g. '', 'a') and any numerics (e.g. '10'). Also lower-case everything.
+    words = [word.lower() for word in words if len(word) > 1 and not word.isnumeric()]
+    
+    # Remove any duplicates by using set().
+    return set(words)
