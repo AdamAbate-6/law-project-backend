@@ -1,5 +1,7 @@
 import json
 import re
+import yaml
+import os
 
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts.chat import (
@@ -11,11 +13,19 @@ from langchain.prompts.chat import (
 from langchain.schema import (
     AIMessage,
     HumanMessage,
-    SystemMessage
+    SystemMessage,
+    PromptValue
 )
 
+# TODO Need to learn about more secure ways of doing auth.
+with open('./api_keys.yaml', 'r') as f:
+    __keys = yaml.safe_load(f)
 
-def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> str:
+os.environ["OPENAI_API_KEY"] = __keys['openai']
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '../law-project-service-account.json'
+
+
+def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> PromptValue:
 
     # First, define templates. TODO this should be extracted elsewhere and choice of template made configurable for easy experimentation.
     sys_msg_template = """
@@ -61,7 +71,14 @@ def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> str:
     # chat_prompt_template = ChatPromptTemplate.from_messages([sys_msg_prompt_template, human_msg_prompt_template])
     chat_prompt_template = ChatPromptTemplate.from_messages(messages)
 
-    patent_as_string = json.dumps(patent)
+    # Remove MongoDB _id field. It is unserializable, and while we could convert it to a string before serializing,
+    #  it is not helpful to have in the prompt, so no point.
+    patent_for_prompt = patent.copy()
+    if '_id' in patent_for_prompt.keys():
+        patent_for_prompt.pop('_id')
+    patent_as_string = json.dumps(patent_for_prompt)
+
+    # Validate last input in message history as being from user.
     question = chat[-1]
     assert question['source'] == 'user', \
         f'Attempting to construct an AI prompt when last message was from `{question["source"]}`. Needs to be from `user`.'
@@ -74,13 +91,22 @@ def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> str:
     chat_prompt = chat_prompt_template.format_prompt(question=question_txt, 
                                                      patent=patent_as_string, 
                                                      unique_words=json.dumps(unique_word_lists)).to_messages()
-    chat_prompt
+    return chat_prompt
 
 
-def generate_ai_response(prompt: str) -> str:
-    # TODO
-    chat = ChatOpenAI(temperature=0, openai_api_key=openai_api_key)
-    return chat(prompt)
+def generate_ai_response(chat_prompt: PromptValue) -> str:
+    """Given a prompt, generate the AI's response.
+
+    Args:
+        chat_prompt (PromptValue): A LangChain prompt, e.g. as returned from ChatPromptTemplate.format_prompt()
+
+    Returns:
+        str: The AI response
+    """
+
+    chat = ChatOpenAI(temperature=0)
+    result = chat.generate([chat_prompt])
+    return result.generations[0][0].text
 
 
 def get_unique_words_per_indep_claim(claims: str) -> dict[str, list[str]]:
@@ -98,7 +124,6 @@ def get_unique_words_per_indep_claim(claims: str) -> dict[str, list[str]]:
 
     # Identify which entries of claims_list are independent claims.
     dep_claim_pattern = 'of\s+claim'
-    indep_claims = [c for c in claims_list if re.search(dep_claim_pattern, c) is None]
     indep_claim_indices = [i for i, c in enumerate(claims_list) if re.search(dep_claim_pattern, c) is None]
 
     # Make a dictionary whose keys are independent claim numbers and whose values are the 1) the text of those independent claims,
