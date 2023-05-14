@@ -29,8 +29,8 @@ def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> PromptValue
 
     # First, define templates. TODO this should be extracted elsewhere and choice of template made configurable for easy experimentation.
     sys_msg_template = """
-    You are a helpful assistant to a patent lawyer. The lawyer wants your help understanding a patent.
-    Answer the lawyer's questions about the patent in 300 words or less. Cite text from the patent in quotes in your answer. If you don't know the answer, just say that you don't know. 
+    You are a helpful assistant to a patent lawyer. The lawyer wants your help understanding a patent. Address him or her in the second person.
+    Answer the lawyer's questions about the patent in 150 words or less. Cite text from the patent in quotes in your answer. If you don't know the answer, just say that you don't know. 
     Don't try to make up an answer. If you are uncertain about any part of your answer, say so. 
 
     Use the following information in thinking through your answer. First, the patent is delimited by triple backticks. Second, the words that appear uniquely in each independent claim are
@@ -49,7 +49,7 @@ def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> PromptValue
 
     sys_msg_prompt_template = SystemMessagePromptTemplate.from_template(sys_msg_template)
 
-    human_template = """The lawyer's question is delimited with triple backticks.
+    human_template = """The lawyer's question is delimited with triple backticks. Answer the question in fewer than 150 words.
 
     Lawyer's question: '''{question}'''"""
 

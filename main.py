@@ -11,7 +11,8 @@ from models import (
     ProjectDataFromClient,
     ProjectDataToClient, 
     PatentDataToClient,
-    UserInput,
+    # UserInput,
+    ProjectDataEditsFromClient,
     AiResponse)
 from database import (
     fetch_one_user,
@@ -22,7 +23,8 @@ from database import (
     create_patent,
     modify_user,
     modify_project_chat,
-    modify_project_patents)
+    modify_project_patents,
+    modify_project)
 from big_query_utils import query_patent
 from llm_utils import (
     construct_ai_prompt, 
@@ -134,91 +136,174 @@ async def put_user_modifications(user_id: str, user_entry: UserDataEditsFromClie
 
 
 @app.put("/api/project/{project_id}", response_model=ProjectDataToClient)
-async def put_project_modifications(project_id: str, user_input: UserInput):
+async def put_project_modifications(project_id: str, project_edits: ProjectDataEditsFromClient, user_id: str | None = None):
+    """Modify project document in DB corresponding to project_id. If user_id is specified (not None), only apply project_edits
+    to the specified user. Otherwise, each field in project_edits will completely replace its corresponding field in the project
+    document.
 
-    # Get the project record that needs to be updated.
-    project_entry = await fetch_one_project(project_id)
+    Args:
+        project_id (str): Mongo DB project document's _id
+        project_edits (ProjectDataEditsFromClient): Object whose fields add to or replace data in the proejct document
+        user_id (str | None, optional): If specified, only data for this user is replaced by project_edits. Defaults to None.
 
-    # Check whether chat should be updated with contents of user_input.
-    response1 = None
-    if user_input.msg is not None:
+    Raises:
+        HTTPException: If the DB request to modify the project fails.
 
-        # First, get the part of the project chat corresponding to this user.
-        user_id = user_input.user_id
-        chat = project_entry['chat']
-        user_chat = chat[user_id]
+    Returns:
+        ProjectDataToClient: The project document with _id stringified.
+    """
 
-        # Second, put the new message from the user into the user's chat.
-        # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
-        new_chat_msg = {'source': 'user', 'msg': user_input.msg}
-        user_chat.append(new_chat_msg)
+    project_edits = {k: v for k, v in project_edits.dict().items() if v is not None}
 
-        # Third, update the dictionary of project chats with the updated user chat.
-        chat[user_id] = user_chat
+    def only_edit_field_for_user(field_name: str, user_id: str, existing_project_entry: dict, project_edits: dict) -> dict:
+        """Each project_edits key replaces the *entire* corresponding key's value in the DB. So make sure parts
+        of the field corresponding to other users remain unchanged by adding them in their original state
+        to project_edits.
 
-        # Finally, update the project entry in MongoDB with the new chat.
-        response1 = await modify_project_chat(project_id, updated_chat=chat)
+        Args:
+            field_name (str): Key of DB document to edit (see models.py's ProjectDataEditsFromClient for keys)
+            user_id (str): Mongo DB user document's _id
+            existing_project_entry (dict): Dict representation of Mongo DB document for project
+            project_edits (dict): Dict having key-value pairs for just the fields of the project edited in this request.
 
-    response2 = None
-    if user_input.patent_number is not None and user_input.patent_office is not None:
-        
-        # First, get the part of the project patents corresponding to this user.
-        user_id = user_input.user_id
-        patents = project_entry['patents']
+        Returns:
+            dict: Version of project_edits containing the new info in project_edits and unedited info for other users on 
+            this project.
+        """
+
+        tmp = dict()
+        if user_id in existing_project_entry[field_name].keys():
+            tmp = {uid: project_edits[field_name][user_id] if uid == user_id 
+                                          else existing_chat
+                                     for uid, existing_chat in existing_project_entry[field_name].items()}
+        else:
+            tmp = existing_project_entry[field_name]
+            tmp[user_id] = project_edits[field_name][user_id]
+
+        project_edits[field_name] = tmp
+        return project_edits
+
+    # Only add patents to the project that don't already exist for user. Also, only modify the part
+    #  of patents corresponding to queried user. Or if user is not in project, add user entry to patents. 
+    existing_project_entry = None
+    if 'patents' in project_edits.keys() and user_id is not None:
+        existing_project_entry = await fetch_one_project(project_id)
+        patents = existing_project_entry['patents']
         user_patents = patents[user_id]
 
-        # Second, put the new patent from the user input into the user's list of patents.
-        # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
-        new_patent = {'office': user_input.patent_office, 'number': user_input.patent_number}
+        patents_to_add = []
+        for p in project_edits['patents'][user_id]:
+            edit_patent = {'office': p['office'], 'number': p['number']}
 
-        # Check if patent already exists in user's list of patents.
-        patent_exists = any([p == new_patent for p in user_patents])
-        if patent_exists:
-            # It exists, so just return project data without modifications.
-            response2 = project_entry 
+            # Check if patent already exists in user's list of patents.
+            patent_exists = any([p == edit_patent for p in user_patents])
+            if not patent_exists:
+                patents_to_add.append(edit_patent)
 
-        else:
-            # Patent not in user's list of patents within project, so put it there. 
-            user_patents.append(new_patent)
+        project_edits['patents'][user_id] = patents_to_add
+        
+        project_edits = only_edit_field_for_user('patents', user_id, existing_project_entry, project_edits)
 
-            # Third, update the dictionary of project patents with the updated user patent list.
-            patents[user_id] = user_patents
+    # Only modify the part of the chat corresponding to queried user. Or if user is not in project, add user entry to chat.
+    if 'chat' in project_edits.keys() and user_id is not None:
+        if existing_project_entry is None:
+            existing_project_entry = await fetch_one_project(project_id)
 
-            # Finally, update the project entry in MongoDB with the new patent list.
-            response2 = await modify_project_patents(project_id, updated_patents=patents)
+        project_edits = only_edit_field_for_user('chat', user_id, existing_project_entry, project_edits)
 
-    response = None
-    if response1 and response2:  # Both chat and patents were modified, so only trust return of latter since it was executed second.
-        response = response2
-
-    elif response1:
-        response = response1
-
-    elif response2:
-        response = response2
+    response = await modify_project(project_id, updated_project=project_edits)
 
     if response:
         return reformat_mongodb_id_field(response)
+
+    # # Get the project record that needs to be updated.
+    # project_entry = await fetch_one_project(project_id)
+
+    # # Check whether chat should be updated with contents of user_input.
+    # response1 = None
+    # if user_input.msg is not None:
+
+    #     # First, get the part of the project chat corresponding to this user.
+    #     user_id = user_input.user_id
+    #     chat = project_entry['chat']
+    #     user_chat = chat[user_id]
+
+    #     # Second, put the new message from the user into the user's chat.
+    #     # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
+    #     new_chat_msg = {'source': 'user', 'msg': user_input.msg}
+    #     user_chat.append(new_chat_msg)
+
+    #     # Third, update the dictionary of project chats with the updated user chat.
+    #     chat[user_id] = user_chat
+
+    #     # Finally, update the project entry in MongoDB with the new chat.
+    #     response1 = await modify_project_chat(project_id, updated_chat=chat)
+
+    # response2 = None
+    # if user_input.patent_number is not None and user_input.patent_office is not None:
+        
+    #     # First, get the part of the project patents corresponding to this user.
+    #     user_id = user_input.user_id
+    #     patents = project_entry['patents']
+    #     user_patents = patents[user_id]
+
+    #     # Second, put the new patent from the user input into the user's list of patents.
+    #     # new_chat_msg = ChatEntry.parse_obj({'source': 'user', 'msg': user_input.msg})
+    #     new_patent = {'office': user_input.patent_office, 'number': user_input.patent_number}
+
+    #     # Check if patent already exists in user's list of patents.
+    #     patent_exists = any([p == new_patent for p in user_patents])
+    #     if patent_exists:
+    #         # It exists, so just return project data without modifications.
+    #         response2 = project_entry 
+
+    #     else:
+    #         # Patent not in user's list of patents within project, so put it there. 
+    #         user_patents.append(new_patent)
+
+    #         # Third, update the dictionary of project patents with the updated user patent list.
+    #         patents[user_id] = user_patents
+
+    #         # Finally, update the project entry in MongoDB with the new patent list.
+    #         response2 = await modify_project_patents(project_id, updated_patents=patents)
+
+    # response = None
+    # if response1 and response2:  # Both chat and patents were modified, so only trust return of latter since it was executed second.
+    #     response = response2
+
+    # elif response1:
+    #     response = response1
+
+    # elif response2:
+    #     response = response2
+
+    # if response:
+    #     return reformat_mongodb_id_field(response)
     
     raise HTTPException(400, 'Something went wrong.')
 
 # ==========================================================
 @app.get("/api/ai", response_model=AiResponse)
 async def get_ai_response(project_id: Annotated[str, PROJECT_ID_QUERY], 
-                          user_id: Annotated[str, USER_ID_QUERY]):
+                          user_id: Annotated[str, USER_ID_QUERY],
+                          last_user_chat_msg: str):
 
     # Get the chat (list of dicts with 'source' and 'msg' keys) for this project and user.
     project_entry = await fetch_one_project(project_id)
     chat = project_entry['chat']
     user_chat = chat[user_id]
+    # Handle case that frontend's request to put last user msg in DB has not completed yet. In that case,
+    #  append message from frontend to local copy of the un-updated chat log pulled from the DB.
+    last_msg_in_db  = user_chat[-1]
+    db_is_up_to_date = last_msg_in_db['source'] == 'user' and last_msg_in_db['msg'] == last_user_chat_msg
+    if not db_is_up_to_date:
+        user_chat.append({'source': 'user', 'msg': last_user_chat_msg})
 
     # Get the patent (TODO design prompt to allow more than one patent and then fetch all patents whose metadata is in project_entry['patents'][user_id]).
     patent_metadata = project_entry['patents'][user_id][0]
     patent_spif = patent_metadata['office'] + patent_metadata['number']
     patent = await fetch_one_patent(patent_spif)
 
-    # TODO generate AI response based on the above.
-    # ai_msg = 'This is a test AI response!'
     prompt = construct_ai_prompt(user_chat, patent)
     ai_msg = generate_ai_response(prompt)
 

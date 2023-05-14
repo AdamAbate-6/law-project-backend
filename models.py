@@ -54,6 +54,14 @@ class ProjectDataFromClient(BaseModel):
     user_ids: list[str]
     document_ids: list[str]
 
+class ProjectDataEditsFromClient(BaseModel):
+    name: str | None = None
+    # chat is a dictionary with as many entries as users on the project. Each key is a user ID. Each value is a list of Chat messages between that user and the AI.
+    chat: dict[str, list[ChatEntry]] | None = None
+    patents: dict[str, list[PatentEntry]] | None = None
+    user_ids: list[str] | None = None
+    document_ids: list[str] | None = None
+
 
 class ProjectDataToClient(BaseModel):
     """
@@ -78,14 +86,14 @@ class PatentDataToClient(BaseModel):
 
 # ==========================================================
 
-class UserInput(BaseModel):
-    """
-    This comes from the UI and so has to specify the user in addition to message contents or patent info.
-    """
-    user_id: str
-    msg: str | None = None
-    patent_number: str | None = None  # E.g. D631,198S
-    patent_office: str | None = None  # E.g. WO
+# class UserInput(BaseModel):
+#     """
+#     This comes from the UI and so has to specify the user in addition to message contents or patent info.
+#     """
+#     user_id: str
+#     msg: str | None = None
+#     patent_number: str | None = None  # E.g. D631,198S
+#     patent_office: str | None = None  # E.g. WO
 
 
 class AiResponse(BaseModel):
