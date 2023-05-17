@@ -113,7 +113,9 @@ async def post_patent(patent_spif: str, api_response: Response):
         return reformat_mongodb_id_field(db_response)
     else:
         # Patent doesn't exist, so query BigQuery for it.
-        patent_data = query_patent(patent_spif)
+        patent_data, found_patent_in_bq = query_patent(patent_spif)
+        if not found_patent_in_bq:
+            raise HTTPException(404, 'Patent not found in BigQuery')
         db_response = await create_patent(patent_data)
         if db_response:
             api_response.status_code = status.HTTP_201_CREATED

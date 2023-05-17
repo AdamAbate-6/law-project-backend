@@ -2,7 +2,7 @@ import os
 from google.cloud import bigquery
 
 
-def query_patent(patent_spif: str) -> dict:
+def query_patent(patent_spif: str) -> tuple[dict, bool]:
 
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './law-project-service-account.json'
     client = bigquery.Client()
@@ -32,4 +32,5 @@ def query_patent(patent_spif: str) -> dict:
         num_iters += 1
         assert num_iters == 1, f'More than one entry was returned from BigQuery query to patent SPIF {patent_spif}; that cannot be correct.'
     
-    return patent_data
+    found_patent_in_bq = True if len(patent_data) > 1 else False
+    return patent_data, found_patent_in_bq
