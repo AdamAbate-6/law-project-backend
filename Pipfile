@@ -13,6 +13,8 @@ pypdf = "*"
 tiktoken = "*"
 faiss-cpu = "*"
 google-cloud-bigquery = "*"
+llama-index = "*"
+nltk = "*"
 
 [dev-packages]
 

@@ -302,9 +302,12 @@ async def get_ai_response(project_id: Annotated[str, PROJECT_ID_QUERY],
         user_chat.append({'source': 'user', 'msg': last_user_chat_msg})
 
     # Get the patent (TODO design prompt to allow more than one patent and then fetch all patents whose metadata is in project_entry['patents'][user_id]).
-    patent_metadata = project_entry['patents'][user_id][0]
-    patent_spif = patent_metadata['office'] + patent_metadata['number']
-    patent = await fetch_one_patent(patent_spif)
+    if len(project_entry['patents'][user_id]) > 0:
+        patent_metadata = project_entry['patents'][user_id][0]
+        patent_spif = patent_metadata['office'] + patent_metadata['number']
+        patent = await fetch_one_patent(patent_spif)
+    else:
+        patent = "No patent is available"
 
     prompt = construct_ai_prompt(user_chat, patent)
     ai_msg = generate_ai_response(prompt)

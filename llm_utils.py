@@ -18,20 +18,20 @@ from langchain.schema import (
 )
 
 # TODO Need to learn about more secure ways of doing auth.
-with open('./api_keys.yaml', 'r') as f:
+with open('../config.yaml', 'r') as f:
     __keys = yaml.safe_load(f)
 
 os.environ["OPENAI_API_KEY"] = __keys['openai']
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '../law-project-service-account.json'
 
 
-def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> PromptValue:
+def construct_ai_prompt(chat: list[dict[str, str]], patent: dict | str) -> PromptValue:
 
     # First, define templates. TODO this should be extracted elsewhere and choice of template made configurable for easy experimentation.
     sys_msg_template = """
     You are a helpful assistant to a patent lawyer. The lawyer wants your help understanding a patent. Address him or her in the second person.
     Answer the lawyer's questions about the patent in 150 words or less. Cite text from the patent in quotes in your answer. If you don't know the answer, just say that you don't know. 
-    Don't try to make up an answer. If you are uncertain about any part of your answer, say so. 
+    Don't try to make up an answer. If you are uncertain about any part of your answer, say so. If the user has not specified a patent, request that they do so.
 
     Use the following information in thinking through your answer. First, the patent is delimited by triple backticks. Second, the words that appear uniquely in each independent claim are
     given in a JSON delimited by triple backticks. For example, independent claim 1 has key '1' in the JSON, and its values are all words that appear only in independent claim 1 and its
@@ -73,18 +73,24 @@ def construct_ai_prompt(chat: list[dict[str, str]], patent: dict) -> PromptValue
 
     # Remove MongoDB _id field. It is unserializable, and while we could convert it to a string before serializing,
     #  it is not helpful to have in the prompt, so no point.
-    patent_for_prompt = patent.copy()
-    if '_id' in patent_for_prompt.keys():
-        patent_for_prompt.pop('_id')
-    patent_as_string = json.dumps(patent_for_prompt)
+    if type(patent) == dict:
+        patent_for_prompt = patent.copy()
+        if '_id' in patent_for_prompt.keys():
+            patent_for_prompt.pop('_id')
+        patent_as_string = json.dumps(patent_for_prompt)
+        
+        unique_word_lists = get_unique_words_per_indep_claim(patent['claims'])
+    else:
+        print('Warning: No patent has been specified.')
+        patent_as_string = patent
+
+        unique_word_lists = 'No patent was specified.'
 
     # Validate last input in message history as being from user.
     question = chat[-1]
     assert question['source'] == 'user', \
         f'Attempting to construct an AI prompt when last message was from `{question["source"]}`. Needs to be from `user`.'
     question_txt = question['msg']
-
-    unique_word_lists = get_unique_words_per_indep_claim(patent['claims'])
 
     # Get a chat completion from the formatted messages.
     # Both page_content and 'source' key of metadata are injected into prompt in document QA. Formatting still unclear. For now just passing page_content because only have single doc.

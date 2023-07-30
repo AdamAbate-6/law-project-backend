@@ -1,11 +1,17 @@
+import yaml
+
 # MongoDB driver
 import motor.motor_asyncio
 from bson.objectid import ObjectId
 
 from models import ChatEntry, PatentEntry
 
+with open('../config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
 # Connection between database.py and MongoDB
-client = motor.motor_asyncio.AsyncIOMotorClient('mongodb://localhost:27017')
+# client = motor.motor_asyncio.AsyncIOMotorClient('mongodb://localhost:27017')
+client = motor.motor_asyncio.AsyncIOMotorClient(f'mongodb+srv://{config["mongodb_user"]}:{config["mongodb_pw"]}@cluster0.wyovote.mongodb.net/?retryWrites=true&w=majority')
 # Create or get a database named Law.
 database = client.law
 # A collection is analogous to a SQL table.

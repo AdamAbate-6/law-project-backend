@@ -4,7 +4,7 @@ from google.cloud import bigquery
 
 def query_patent(patent_spif: str) -> tuple[dict, bool]:
 
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './law-project-service-account.json'
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '../law-project-service-account.json'
     client = bigquery.Client()
 
     # Perform a query. Need to UNNEST the struct of string arrays in several fields.
