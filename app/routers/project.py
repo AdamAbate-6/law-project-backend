@@ -63,10 +63,15 @@ async def put_project_modifications(
         ProjectDataToClient: The project document with _id stringified.
     """
 
-    project_edits = {k: v for k, v in project_edits.dict().items() if v is not None}
+    project_edits = {
+        k: v for k, v in project_edits.dict().items() if v is not None
+    }
 
     def only_edit_field_for_user(
-        field_name: str, user_id: str, existing_project_entry: dict, project_edits: dict
+        field_name: str,
+        user_id: str,
+        existing_project_entry: dict,
+        project_edits: dict,
     ) -> dict:
         """Each project_edits key replaces the *entire* corresponding key's value in the DB. So make sure parts
         of the field corresponding to other users remain unchanged by adding them in their original state
@@ -89,7 +94,9 @@ async def put_project_modifications(
                 uid: project_edits[field_name][user_id]
                 if uid == user_id
                 else existing_chat
-                for uid, existing_chat in existing_project_entry[field_name].items()
+                for uid, existing_chat in existing_project_entry[
+                    field_name
+                ].items()
             }
         else:
             tmp = existing_project_entry[field_name]

@@ -4,7 +4,7 @@ import yaml
 import motor.motor_asyncio
 from bson.objectid import ObjectId
 
-from models import ChatEntry, PatentEntry
+from app.lib.models.project import ChatEntry, PatentEntry
 
 with open("../config.yaml", "r") as f:
     config = yaml.safe_load(f)

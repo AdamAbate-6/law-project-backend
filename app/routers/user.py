@@ -31,7 +31,9 @@ async def get_user_by_email(email: Annotated[str, USER_EMAIL_PATH]):
     raise HTTPException(404, f"There is no user with email {email}")
 
 
-@router.post("/", response_model=UserDataToClient, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=UserDataToClient, status_code=status.HTTP_201_CREATED
+)
 async def post_user(user_entry: UserDataFromClient):
     db_response = await create_user(user_entry.dict())
     if db_response:

@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.lib.models.ai import AiResponse
 from app.lib.api_validators import PROJECT_ID_QUERY, USER_ID_QUERY
-from app.lib.database import fetch_one_project, fetch_one_patent, modify_project_chat
+from app.lib.database import (
+    fetch_one_project,
+    fetch_one_patent,
+    modify_project_chat,
+)
 from app.lib.llm import construct_ai_prompt, generate_ai_response
 
 router = APIRouter(

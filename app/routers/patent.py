@@ -3,7 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.lib.models.patent import PatentDataToClient
-from app.lib.database import reformat_mongodb_id_field, fetch_one_patent, create_patent
+from app.lib.database import (
+    reformat_mongodb_id_field,
+    fetch_one_patent,
+    create_patent,
+)
 from app.lib.big_query import query_patent
 from app.lib.api_validators import PATENT_SPIF_PATH
 
@@ -34,5 +38,6 @@ async def post_patent(
             api_response.status_code = status.HTTP_201_CREATED
             return reformat_mongodb_id_field(db_response)
         raise HTTPException(
-            400, "Something went wrong during patent creation in DB / bad request"
+            400,
+            "Something went wrong during patent creation in DB / bad request",
         )
