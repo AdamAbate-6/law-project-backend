@@ -15,6 +15,7 @@ faiss-cpu = "*"
 google-cloud-bigquery = "*"
 llama-index = "*"
 nltk = "*"
+pylint = "*"
 
 [dev-packages]
 
