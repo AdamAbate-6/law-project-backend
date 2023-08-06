@@ -39,3 +39,12 @@ uvicorn main:app --reload
 
 ### Deployment TODOs
 * Change main.py's frontend URI and database.py's database URI.
+
+
+### Refactor TODO
+* Put everything FastAPI-related inside src
+* Put everything chat-related inside src/chat folder
+	* API router here as well as all logic
+* src/user
+* src/project
+	* Patent uploads, index creation

@@ -24,7 +24,7 @@ from llama_index import (
     GPTListIndex,
     download_loader)
 
-root_dir = 'C:\\Users\\abate\\Code\\law_project'
+root_dir = 'C:\\Users\\adam\\Code\\law_project'
 
 with open(os.path.join(root_dir, 'config.yaml'), 'r') as f:
     config = yaml.safe_load(f)
@@ -203,6 +203,8 @@ query_engine_tools = [
     for index, spif in zip(patent_keyword_indices, patent_spifs)
 ]
 
-query_engine = SubQuestionQueryEngine.from_defaults(query_engine_tools=query_engine_tools, service_context=service_context)
+# See https://github.com/jerryjliu/llama_index/issues/7090; need to set 
+#  use_async to False until resolved.
+query_engine = SubQuestionQueryEngine.from_defaults(query_engine_tools=query_engine_tools, service_context=service_context, use_async=False)
 
 response = query_engine.query('Compare and constrast claim 1 of patent US8205344B2 with claim 1 of US9889572B2')
