@@ -4,8 +4,6 @@ import yaml
 import motor.motor_asyncio
 from bson.objectid import ObjectId
 
-from app.lib.models.project import ChatEntry, PatentEntry
-
 with open("../config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
@@ -106,37 +104,17 @@ async def create_project(project_entry: dict) -> dict:
 
 
 async def modify_project(project_id: str, updated_project: dict) -> dict:
-    """Update the project entry with _id == project_id with the contents of updated_project
+    """Update the project entry with _id == project_id with the contents of
+    updated_project
 
     Args:
-        project_id (str): String representation of ObjectId for MongoDB project entry
-        updated_project (dict): Dict whose keys are fields to be modified and whose values are the new field entries. Values should NOT be Nones.
+        project_id (str): String representation of ObjectId for MongoDB project
+        entry
+        updated_project (dict): Dict whose keys are fields to be modified and
+        whose values are the new field entries. Values should NOT be Nones.
     """
     await projects_collection.update_one(
         {"_id": ObjectId(project_id)}, {"$set": updated_project}
-    )
-    document = await projects_collection.find_one({"_id": ObjectId(project_id)})
-    return document
-
-
-async def modify_project_chat(
-    project_id: str, updated_chat: dict[str, list[ChatEntry]]
-) -> dict:
-    """
-    updated_chat is a dictionary with as many entries as users on the project. Each key is a user ID. Each value is a list of Chat messages between that user and the AI.
-    """
-    await projects_collection.update_one(
-        {"_id": ObjectId(project_id)}, {"$set": {"chat": updated_chat}}
-    )
-    document = await projects_collection.find_one({"_id": ObjectId(project_id)})
-    return document
-
-
-async def modify_project_patents(
-    project_id: str, updated_patents: dict[str, list[PatentEntry]]
-) -> dict:
-    await projects_collection.update_one(
-        {"_id": ObjectId(project_id)}, {"$set": {"patents": updated_patents}}
     )
     document = await projects_collection.find_one({"_id": ObjectId(project_id)})
     return document

@@ -1,9 +1,16 @@
+"""
+Pydantic models for data communicated between frontend and backend related to
+the user. For what is stored in the database "users" collection, see
+UserDataToClient for an approximate schema.
+"""
+
 from pydantic import BaseModel
 
 
 class UserDataFromClient(BaseModel):
     """
-    Input expected from client for POSTing a new user. mongo_id/_id is not specified as it will be generated automatically by MongoDB.
+    Input expected from client for POSTing a new user. mongo_id/_id is not
+    specified as it will be generated automatically by MongoDB.
     """
 
     first_name: str
@@ -14,7 +21,8 @@ class UserDataFromClient(BaseModel):
 
 class UserDataEditsFromClient(BaseModel):
     """
-    Input expected from client for PUTting modifications to an existing user. mongo_id/_id is not specified because it is a path parameter in PUT.
+    Input expected from client for PUTting modifications to an existing user.
+    mongo_id/_id is not specified because it is a path parameter in PUT.
     """
 
     first_name: str | None = None
@@ -25,10 +33,12 @@ class UserDataEditsFromClient(BaseModel):
 
 class UserDataToClient(BaseModel):
     """
-    Return type expected from server after GETting a user or POSTing a new user. mongo_id is the string representation of the user entry's _id field.
+    Return type expected from server after GETting a user or POSTing a new
+    user. mongo_id is the string representation of the user entry's _id field.
     """
 
-    # mongo_id will be populated if object of User class is being returned from MongoDB.
+    # mongo_id will be populated if object of User class is being returned
+    #  from MongoDB.
     mongo_id: str
     first_name: str
     last_name: str

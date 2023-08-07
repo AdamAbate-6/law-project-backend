@@ -1,3 +1,8 @@
+"""
+Pydantic models for data communicated between the backend and frontend
+relating to AI processing.
+"""
+
 from pydantic import BaseModel
 
 
