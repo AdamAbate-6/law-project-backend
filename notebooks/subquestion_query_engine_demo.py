@@ -105,17 +105,19 @@ for spif in patent_spifs:
     patent_dicts.append(patent_data)
 
 
-# NOTE: This is called by make_patent_indices(). Should probably live in llm_utils.py
+# NOTE: This is called by make_patent_indices(). Should probably live in
+#  llm_utils.py
 def get_patent_nodes(
     patent_dict: dict, service_context: ServiceContext
 ) -> list[Node]:
     all_nodes = []
     for section_title, section_content in patent_dict.items():
         if section_title == "spif" or section_title == "title":
-            # No need to include SPIF and title as separate nodes for the low level
-            #  index to choose from. Because they are being put in `extra_info`, if
-            #  the node_parser has `include_extra_info` set to True, then spif and
-            #  title will appear at the top of every node.
+            # No need to include SPIF and title as separate nodes for the low
+            #  level index to choose from. Because they are being put in
+            #  `extra_info`, if the node_parser has `include_extra_info` set
+            #  to True, then spif and title will appear at the top of every
+            #  node.
             continue
 
         doc = Document(

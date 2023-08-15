@@ -2,18 +2,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.lib.models.patent import PatentDataToClient
-from app.lib.database import (
+from lib.models.patent import PatentDataToClient
+from lib.database import (
     reformat_mongodb_id_field,
     fetch_one_patent,
     create_patent,
 )
-from app.lib.big_query import query_patent
-from app.lib.api_validators import PATENT_SPIF_PATH
+from lib.big_query import query_patent
+from lib.api_validators import PATENT_SPIF_PATH
 
 
 router = APIRouter(
-    prefix="/patent",
+    prefix="/api/patent",
     tags=["patent"],
     responses={404: {"description": "Not found"}},
 )

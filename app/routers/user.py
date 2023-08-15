@@ -2,22 +2,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.lib.models.user import (
+from lib.models.user import (
     UserDataToClient,
     UserDataEditsFromClient,
     UserDataFromClient,
 )
-from app.lib.database import (
+from lib.database import (
     reformat_mongodb_id_field,
     fetch_one_user,
     create_user,
     modify_user,
 )
-from app.lib.api_validators import USER_EMAIL_PATH, USER_ID_PATH
+from lib.api_validators import USER_EMAIL_PATH, USER_ID_PATH
 
 
 router = APIRouter(
-    prefix="/user",
+    prefix="/api/user",
     tags=["user"],
     responses={404: {"description": "Not found"}},
 )

@@ -2,17 +2,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.lib.models.ai import AiResponse
-from app.lib.api_validators import PROJECT_ID_QUERY, USER_ID_QUERY
-from app.lib.database import (
+from lib.models.ai import AiResponse
+from lib.api_validators import PROJECT_ID_QUERY, USER_ID_QUERY
+from lib.database import (
     fetch_one_project,
     fetch_one_patent,
     modify_project_chat,
 )
-from app.lib.llm import construct_ai_prompt, generate_ai_response
+from lib.llm import construct_ai_prompt, generate_ai_response
 
 router = APIRouter(
-    prefix="/ai",
+    prefix="/api/ai",
     tags=["ai"],
     responses={404: {"description": "Not found"}},
 )

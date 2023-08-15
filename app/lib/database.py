@@ -4,7 +4,10 @@ import yaml
 import motor.motor_asyncio
 from bson.objectid import ObjectId
 
-with open("../config.yaml", "r") as f:
+from lib.models.project import ChatEntry
+
+
+with open("../../config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 # Connection between database.py and MongoDB
@@ -62,7 +65,9 @@ async def fetch_one_user(email: str) -> dict:
 
 
 async def fetch_one_project(project_id: str) -> dict:
-    document = await projects_collection.find_one({"_id": ObjectId(project_id)})
+    document = await projects_collection.find_one(
+        {"_id": ObjectId(project_id)}
+    )
     return document
 
 
@@ -103,6 +108,23 @@ async def create_project(project_entry: dict) -> dict:
     return document
 
 
+async def modify_project_chat(
+    project_id: str, updated_chat: dict[str, list[ChatEntry]]
+) -> dict:
+    """
+    updated_chat is a dictionary with as many entries as users on the project.
+    Each key is a user ID. Each value is a list of Chat messages between that
+    user and the AI.
+    """
+    await projects_collection.update_one(
+        {"_id": ObjectId(project_id)}, {"$set": {"chat": updated_chat}}
+    )
+    document = await projects_collection.find_one(
+        {"_id": ObjectId(project_id)}
+    )
+    return document
+
+
 async def modify_project(project_id: str, updated_project: dict) -> dict:
     """Update the project entry with _id == project_id with the contents of
     updated_project
@@ -116,5 +138,7 @@ async def modify_project(project_id: str, updated_project: dict) -> dict:
     await projects_collection.update_one(
         {"_id": ObjectId(project_id)}, {"$set": updated_project}
     )
-    document = await projects_collection.find_one({"_id": ObjectId(project_id)})
+    document = await projects_collection.find_one(
+        {"_id": ObjectId(project_id)}
+    )
     return document

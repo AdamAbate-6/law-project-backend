@@ -10,16 +10,21 @@ from langchain.prompts.chat import (
     AIMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
-from langchain.schema import AIMessage, HumanMessage, SystemMessage, PromptValue
+from langchain.schema import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+    PromptValue,
+)
 
 # TODO Need to learn about more secure ways of doing auth.
-with open("../config.yaml", "r") as f:
+with open("../../config.yaml", "r") as f:
     __keys = yaml.safe_load(f)
 
 os.environ["OPENAI_API_KEY"] = __keys["openai"]
 os.environ[
     "GOOGLE_APPLICATION_CREDENTIALS"
-] = "../law-project-service-account.json"
+] = "../../law-project-service-account.json"
 
 
 def construct_ai_prompt(
@@ -210,7 +215,9 @@ def get_word_set(multi_word_string: str) -> set:
 
     # Get rid of any length-0 or length-1 words (e.g. '', 'a') and any numerics (e.g. '10'). Also lower-case everything.
     words = [
-        word.lower() for word in words if len(word) > 1 and not word.isnumeric()
+        word.lower()
+        for word in words
+        if len(word) > 1 and not word.isnumeric()
     ]
 
     # Remove any duplicates by using set().

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import (
     CORSMiddleware,
 )  # Cross origin resources sharing
 
-from app.routers import ai, patent, project, user
+from routers import ai, patent, project, user
 
 
 app = FastAPI()
