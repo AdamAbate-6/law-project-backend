@@ -2,6 +2,7 @@ import json
 import re
 import yaml
 import os
+import pathlib
 
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts.chat import (
@@ -18,10 +19,14 @@ from langchain.schema import (
 )
 
 # TODO Need to learn about more secure ways of doing auth.
-with open("../../config.yaml", "r") as f:
-    __keys = yaml.safe_load(f)
+# This file is in law_project/law-project-backend/app/lib. Config file is in
+#  law_project (because that is not version-controlled).
+config_dir = str(pathlib.Path(os.path.abspath(__file__)).parents[3])
+config_path = os.path.join(config_dir, "config.yaml")
+with open(config_path, "r") as f:
+    config = yaml.safe_load(f)
 
-os.environ["OPENAI_API_KEY"] = __keys["openai"]
+os.environ["OPENAI_API_KEY"] = config["openai"]
 os.environ[
     "GOOGLE_APPLICATION_CREDENTIALS"
 ] = "../../law-project-service-account.json"

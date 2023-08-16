@@ -39,6 +39,7 @@ async def get_ai_response(
         user_chat.append({"source": "user", "msg": last_user_chat_msg})
 
     # Get the patent (TODO design prompt to allow more than one patent and then fetch all patents whose metadata is in project_entry['patents'][user_id]).
+    print(project_entry["patents"][user_id])
     if len(project_entry["patents"][user_id]) > 0:
         patent_metadata = project_entry["patents"][user_id][0]
         patent_spif = patent_metadata["office"] + patent_metadata["number"]

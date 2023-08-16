@@ -1,11 +1,16 @@
 import os
+import pathlib
+
 from google.cloud import bigquery
 
 
 def query_patent(patent_spif: str) -> tuple[dict, bool]:
-    os.environ[
-        "GOOGLE_APPLICATION_CREDENTIALS"
-    ] = "../law-project-service-account.json"
+    # This file is in law_project/law-project-backend/app/lib. Config file is
+    #  in law_project (because that is not version-controlled).
+    config_dir = str(pathlib.Path(os.path.abspath(__file__)).parents[3])
+    config_path = os.path.join(config_dir, "law-project-service-account.json")
+
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = config_path
     client = bigquery.Client()
     # Perform a query. Need to UNNEST the struct of string arrays in several
     #  fields.

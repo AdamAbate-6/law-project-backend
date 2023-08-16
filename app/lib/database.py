@@ -1,4 +1,6 @@
 import yaml
+import pathlib
+import os
 
 # MongoDB driver
 import motor.motor_asyncio
@@ -6,8 +8,11 @@ from bson.objectid import ObjectId
 
 from lib.models.project import ChatEntry
 
-
-with open("../../config.yaml", "r") as f:
+# This file is in law_project/law-project-backend/app/lib. Config file is in
+#  law_project (because that is not version-controlled).
+config_dir = str(pathlib.Path(os.path.abspath(__file__)).parents[3])
+config_path = os.path.join(config_dir, "config.yaml")
+with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
 # Connection between database.py and MongoDB
