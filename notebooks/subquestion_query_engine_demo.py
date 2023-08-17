@@ -153,7 +153,7 @@ llm_predictor = LLMPredictor(
     llm=OpenAI(
         temperature=0,
         model_name="gpt-3.5-turbo",
-        openai_api_key="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",
+        openai_api_key=config["openai"],
     )
 )
 
