@@ -25,7 +25,8 @@ async def post_patent_index(
     # First, see if patent already exists in DB.
     db_response = await fetch_one_patent(patent_spif)
     if db_response:
-        patent_nodes = get_patent_nodes(db_response, service_context)
+        patent_dict = {k: v for k, v in db_response.items() if k != "_id"}
+        patent_nodes = get_patent_nodes(patent_dict, service_context)
         # Index will be persisted to a DB named law_patent_indices in a
         #  collection whose name is the patent_spif.
         index_store = MongoIndexStore.from_uri(
@@ -41,6 +42,9 @@ async def post_patent_index(
             storage_context=StorageContext.from_defaults(
                 index_store=index_store
             ),
+        )
+        custom_index.summary = (
+            f"Use this index for queries about patent with SPIF {patent_spif}"
         )
         api_response.status_code = status.HTTP_200_OK
         return reformat_mongodb_id_field(db_response)

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import (
     CORSMiddleware,
 )  # Cross origin resources sharing
 
-from routers import ai, patent, project, user
+from routers import ai, patent, project, user, index
 
 
 app = FastAPI()
@@ -29,6 +29,7 @@ app.include_router(ai.router)
 app.include_router(patent.router)
 app.include_router(project.router)
 app.include_router(user.router)
+app.include_router(index.router)
 
 
 @app.get("/")
