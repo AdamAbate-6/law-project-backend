@@ -17,9 +17,11 @@ with open(config_path, "r") as f:
 
 # Connection between database.py and MongoDB
 # client = motor.motor_asyncio.AsyncIOMotorClient('mongodb://localhost:27017')
-client = motor.motor_asyncio.AsyncIOMotorClient(
-    f'mongodb+srv://{config["mongodb_user"]}:{config["mongodb_pw"]}@cluster0.wyovote.mongodb.net/?retryWrites=true&w=majority'
+db_uri = (
+    f'mongodb+srv://{config["mongodb_user"]}:{config["mongodb_pw"]}@'
+    f"cluster0.wyovote.mongodb.net/?retryWrites=true&w=majority"
 )
+client = motor.motor_asyncio.AsyncIOMotorClient(db_uri)
 # Create or get a database named Law.
 database = client.law
 # A collection is analogous to a SQL table.
