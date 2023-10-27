@@ -51,9 +51,11 @@ uvicorn main:app --reload
 
 ### Refactor TODO
 
-- Put everything FastAPI-related inside src
+<!-- - Put everything FastAPI-related inside src
 - Put everything chat-related inside src/chat folder
   - API router here as well as all logic
 - src/user
 - src/project
-  - Patent uploads, index creation
+  - Patent uploads, index creation -->
+
+- Now that index exists, need to use it in combination with sqqe in routers/ai.py

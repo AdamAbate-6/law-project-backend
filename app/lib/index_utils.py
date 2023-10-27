@@ -1,5 +1,16 @@
-from llama_index import ServiceContext, Document, Prompt
+from llama_index import (
+    ServiceContext,
+    Document,
+    Prompt,
+    StorageContext,
+    load_index_from_storage,
+)
 from llama_index.data_structs import Node
+from llama_index.storage.docstore import MongoDocumentStore
+from llama_index.storage.index_store import MongoIndexStore
+from llama_index.indices.base import BaseIndex
+
+from lib.database import db_uri
 
 
 extract_keyword_prompt = Prompt(
@@ -46,3 +57,27 @@ def get_patent_nodes(
             all_nodes.append(node)
 
     return all_nodes
+
+
+def load_index(patent_spif: str) -> BaseIndex:
+    """Connect to the databases holding indices and patent nodes and construct
+    from them an index.
+
+    Args:
+        patent_spif (dict): String representing patent office code and number
+
+    Returns:
+        BaseIndex: The loaded index
+    """
+
+    index_store = MongoIndexStore.from_uri(
+        uri=db_uri, db_name="law_patent_indices", namespace=patent_spif
+    )
+    doc_store = MongoDocumentStore.from_uri(
+        uri=db_uri, db_name="law_patent_nodes", namespace=patent_spif
+    )
+    storage_context = StorageContext.from_defaults(
+        index_store=index_store, docstore=doc_store
+    )
+    index = load_index_from_storage(storage_context)
+    return index

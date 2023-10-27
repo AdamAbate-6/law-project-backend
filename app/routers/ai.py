@@ -1,15 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from llama_index.tools import QueryEngineTool, ToolMetadata
+from llama_index.query_engine import SubQuestionQueryEngine
 
 from lib.models.ai import AiResponse
 from lib.api_validators import PROJECT_ID_QUERY, USER_ID_QUERY
-from lib.database import (
-    fetch_one_project,
-    fetch_one_patent,
-    modify_project_chat,
-)
-from lib.llm import construct_ai_prompt, generate_ai_response
+from lib.database import fetch_one_project, modify_project_chat
+from lib.llm import construct_ai_prompt, generate_ai_response, service_context
+from lib.index_utils import load_index
 
 router = APIRouter(
     prefix="/api/ai",
@@ -39,11 +38,51 @@ async def get_ai_response(
         user_chat.append({"source": "user", "msg": last_user_chat_msg})
 
     # Get the patent (TODO design prompt to allow more than one patent and then fetch all patents whose metadata is in project_entry['patents'][user_id]).
-    print(project_entry["patents"][user_id])
     if len(project_entry["patents"][user_id]) > 0:
-        patent_metadata = project_entry["patents"][user_id][0]
-        patent_spif = patent_metadata["office"] + patent_metadata["number"]
-        patent = await fetch_one_patent(patent_spif)
+        query_engine_tools = []
+        for patent_metadata in project_entry["patents"][user_id]:
+            patent_spif = patent_metadata["office"] + patent_metadata["number"]
+            index = load_index(patent_spif)
+
+            qe = QueryEngineTool(
+                query_engine=index.as_query_engine(),
+                metadata=ToolMetadata(
+                    name=patent_spif,
+                    description=f"Patent with SPIF {patent_spif}",
+                ),
+            )
+            query_engine_tools.append(qe)
+
+        query_engine = SubQuestionQueryEngine.from_defaults(
+            query_engine_tools=query_engine_tools,
+            service_context=service_context,
+            use_async=False,
+        )
+        # 10/26/2023: The below fails on the following error:
+        """Traceback (most recent call last):
+        File "<string>", line 1, in <module>
+        File "C:\Users\abate\.virtualenvs\law-project-backend-Kz-JhaCG\Lib\site-packages\llama_index\indices\query\base.py", line 23, in query
+            response = self._query(str_or_query_bundle)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "C:\Users\abate\.virtualenvs\law-project-backend-Kz-JhaCG\Lib\site-packages\llama_index\query_engine\sub_question_query_engine.py", line 152, in _query
+            response = self._response_synthesizer.synthesize(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File "C:\Users\abate\.virtualenvs\law-project-backend-Kz-JhaCG\Lib\site-packages\llama_index\response_synthesizers\base.py", line 122, in synthesize
+            with self._callback_manager.event(
+        File "C:\Python311\Lib\contextlib.py", line 137, in __enter__
+            return next(self.gen)
+                ^^^^^^^^^^^^^^
+        File "C:\Users\abate\.virtualenvs\law-project-backend-Kz-JhaCG\Lib\site-packages\llama_index\callbacks\base.py", line 169, in event
+            event.on_start(payload=payload)
+        File "C:\Users\abate\.virtualenvs\law-project-backend-Kz-JhaCG\Lib\site-packages\llama_index\callbacks\base.py", line 242, in on_start
+            self._callback_manager.on_event_start(
+        File "C:\Users\abate\.virtualenvs\law-project-backend-Kz-JhaCG\Lib\site-packages\llama_index\callbacks\base.py", line 105, in on_event_start
+            parent_id = global_stack_trace.get()[-1]
+                        ~~~~~~~~~~~~~~~~~~~~~~~~^^^^
+        IndexError: list index out of range
+        """
+        query_engine.query(last_user_chat_msg)
+
     else:
         patent = "No patent is available"
 

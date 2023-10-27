@@ -23,7 +23,9 @@ router = APIRouter(
 async def post_patent_index(
     patent_spif: Annotated[str, PATENT_SPIF_PATH], api_response: Response
 ):
-    # First, see if patent already exists in DB.
+    # First, see if patent exists in DB. If not, raise error, as it is the
+    #  responsibility of whoever uses this endpoint to have put the patent in
+    #  MongoDB before calling this endpoint.
     db_response = await fetch_one_patent(patent_spif)
     if db_response:
         patent_dict = {k: v for k, v in db_response.items() if k != "_id"}
