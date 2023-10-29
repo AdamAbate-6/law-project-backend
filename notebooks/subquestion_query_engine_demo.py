@@ -5,11 +5,18 @@ import os
 import pathlib
 import re
 import yaml
+import time
+
 from google.cloud import bigquery
+import motor.motor_asyncio
+import pymongo
 from langchain import OpenAI
 from llama_index.node_parser import SimpleNodeParser
 from llama_index.data_structs import Node
 from llama_index.schema import MetadataMode
+from llama_index.storage.docstore import MongoDocumentStore
+from llama_index.storage.index_store import MongoIndexStore
+from llama_index.callbacks import LlamaDebugHandler, CallbackManager
 from llama_index import (
     LLMPredictor,
     Document,
@@ -23,9 +30,10 @@ from llama_index import (
     GPTTreeIndex,
     GPTListIndex,
     download_loader,
+    load_index_from_storage,
 )
 
-root_dir = "C:\\Users\\adam\\Code\\law_project"
+root_dir = str(pathlib.Path(os.path.abspath(__file__)).parents[2])
 
 with open(os.path.join(root_dir, "config.yaml"), "r") as f:
     config = yaml.safe_load(f)
@@ -34,6 +42,17 @@ os.environ["OPENAI_API_KEY"] = config["openai"]
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(
     root_dir, "law-project-service-account.json"
 )
+
+# DB for fetching patents already pulled from BigQuery
+db_uri = (
+    f'mongodb+srv://{config["mongodb_user"]}:{config["mongodb_pw"]}@'
+    f"cluster0.wyovote.mongodb.net/?retryWrites=true&w=majority"
+)
+# Commented out since async.
+# db_client = motor.motor_asyncio.AsyncIOMotorClient(db_uri)
+db_client = pymongo.MongoClient(db_uri)
+database = db_client.law
+patents_collection = database.patents
 
 logging.basicConfig(filename="log.log", level=logging.DEBUG, force=True)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -51,52 +70,67 @@ def get_patent_dict(patent_spif):
             f"law-project-backend\\notebooks\\data\\patents\\{patent_spif}.json",
         )
     )
-    if not cache_path.exists():
-        print(f"Could not find cached {cache_path}. Querying BigQuery.")
 
-        # NOTE: New-lines here are purely visual, so need space at end of each line.
-        #  E.g. otherwise end of SELECT line into FROM becomes `as descriptionFROM`.
-        QUERY = (
-            f"SELECT spif_publication_number as spif, t.text as title,  a.text as abstract, c.text as claims, d.text as description "
-            f"FROM `patents-public-data.patents.publications`, UNNEST(title_localized) as t, UNNEST(abstract_localized) as a,  UNNEST(claims_localized) as c, UNNEST(description_localized) as d "
-            f'WHERE spif_publication_number = "{patent_spif}" '
-            f"LIMIT 100"
-        )
-        query_job = None  # client.query(QUERY)  # Send API request.
-        rows = query_job.result()  # Waits for query to finish.
-
-        # `rows` is an iterator, but SPIF should be unique to one patent, so we should only iterate once.
-        num_iters = 0
-        patent_data = dict()
-        for row in rows:
-            patent_data["spif"] = row.spif
-            patent_data["title"] = row.title
-            patent_data["abstract"] = row.abstract
-            patent_data["claims"] = row.claims
-            # TODO Add in description
-
-            num_iters += 1
-            assert (
-                num_iters == 1
-            ), f"More than one entry was returned from BigQuery query to patent SPIF {patent_spif}; that cannot be correct."
-
-        found_patent_in_bq = True if len(patent_data) > 1 else False
-
-        if not cache_path.parent.exists():
-            cache_path.parent.mkdir(parents=True)
-
-        with open(str(cache_path), "w") as f:
-            json.dump(patent_data, f)
-
-    else:
+    if cache_path.exists():
         with open(str(cache_path), "r") as f:
             patent_data = json.load(f)
+
+    else:
+        # Patent not in local cache. Before querying BigQuery, try MongoDB.
+        use_bigquery = False
+        patent_data = patents_collection.find_one({"spif": patent_spif})
+        patent_data.pop("_id")
+        if patent_data is None:
+            use_bigquery = True
+
+        if use_bigquery:
+            raise Exception(
+                "Not in cache or DB; remove this exception if you want to "
+                "query BigQuery."
+            )
+            print(f"Could not find cached {cache_path}. Querying BigQuery.")
+
+            # NOTE: New-lines here are purely visual, so need space at end of each line.
+            #  E.g. otherwise end of SELECT line into FROM becomes `as descriptionFROM`.
+            QUERY = (
+                f"SELECT spif_publication_number as spif, t.text as title,  a.text as abstract, c.text as claims, d.text as description "
+                f"FROM `patents-public-data.patents.publications`, UNNEST(title_localized) as t, UNNEST(abstract_localized) as a,  UNNEST(claims_localized) as c, UNNEST(description_localized) as d "
+                f'WHERE spif_publication_number = "{patent_spif}" '
+                f"LIMIT 100"
+            )
+            query_job = None  # Currently preventing BigQuery from being used.
+            # query_job = client.query(QUERY)  # Send API request.
+            rows = query_job.result()  # Waits for query to finish.
+
+            # `rows` is an iterator, but SPIF should be unique to one patent, so we should only iterate once.
+            num_iters = 0
+            patent_data = dict()
+            for row in rows:
+                patent_data["spif"] = row.spif
+                patent_data["title"] = row.title
+                patent_data["abstract"] = row.abstract
+                patent_data["claims"] = row.claims
+                # TODO Add in description
+
+                num_iters += 1
+                assert (
+                    num_iters == 1
+                ), f"More than one entry was returned from BigQuery query to patent SPIF {patent_spif}; that cannot be correct."
+
+            found_patent_in_bq = True if len(patent_data) > 1 else False
+
+            if not cache_path.parent.exists():
+                cache_path.parent.mkdir(parents=True)
+
+            with open(str(cache_path), "w") as f:
+                json.dump(patent_data, f)
 
     return patent_data
 
 
 # NOTE: Similar code will go in main.py's get_ai_response()
-patent_spifs = ["US8205344B2", "US9889572B2"]
+# patent_spifs = ["US8205344B2", "US9889572B2"]
+patent_spifs = ["US8205344B2", "US9505142B2"]
 patent_texts = []
 patent_dicts = []
 for spif in patent_spifs:
@@ -157,13 +191,14 @@ llm_predictor = LLMPredictor(
     )
 )
 
-from llama_index.logger import LlamaLogger
 
+llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+callback_manager = CallbackManager([llama_debug])
 service_context = ServiceContext.from_defaults(
     chunk_size=1028,
     llm_predictor=llm_predictor,
     node_parser=node_parser,
-    llama_logger=LlamaLogger(),
+    callback_manager=callback_manager,
 )
 
 
@@ -214,9 +249,6 @@ def make_patent_indices(
     patent_keyword_indices = []
     index_summaries = []
     patent_spifs = []
-    os.environ[
-        "OPENAI_API_KEY"
-    ] = "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"
     for patent_dict in patent_dicts:
         nodes = get_patent_nodes(patent_dict, service_context)
         index_summaries.append(
@@ -262,6 +294,48 @@ query_engine = SubQuestionQueryEngine.from_defaults(
     use_async=False,
 )
 
-response = query_engine.query(
-    "Compare and constrast claim 1 of patent US8205344B2 with claim 1 of US9889572B2"
+# response = query_engine.query(
+#     f"Compare and constrast claim 1 of patent {patent_spifs[0]} with claim 1 "
+#     f"of {patent_spifs[1]}"
+# )
+
+
+loaded_indices = []
+for patent_spif in patent_spifs:
+    index_store = MongoIndexStore.from_uri(
+        uri=db_uri, db_name="law_patent_indices", namespace=patent_spif
+    )
+    doc_store = MongoDocumentStore.from_uri(
+        uri=db_uri, db_name="law_patent_nodes", namespace=patent_spif
+    )
+    storage_context = StorageContext.from_defaults(
+        index_store=index_store, docstore=doc_store
+    )
+    index = load_index_from_storage(storage_context)
+    loaded_indices.append(index)
+
+loaded_query_engine_tools = [
+    QueryEngineTool(
+        query_engine=index.as_query_engine(),
+        metadata=ToolMetadata(
+            name=spif, description=f"Patent with SPIF {spif}"
+        ),
+    )
+    for index, spif in zip(loaded_indices, patent_spifs)
+]
+
+loaded_query_engine = SubQuestionQueryEngine.from_defaults(
+    query_engine_tools=loaded_query_engine_tools,
+    service_context=service_context,
+    use_async=False,
 )
+
+try:
+    response = loaded_query_engine.query(
+        f"Compare and constrast claim 1 of patent {patent_spifs[0]} with claim 1 "
+        f"of {patent_spifs[1]}"
+    )
+except:
+    import pdb
+
+    pdb.set_trace()
