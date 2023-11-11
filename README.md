@@ -30,13 +30,23 @@ See https://www.helenjoscott.com/2022/01/29/mongod-mongo-mongosh-mongos-what-now
 
 #### Install Requirements
 
+If developing on a Windows machine, I recommend PyEnv for configuring Python versions. This may be required before you can use pipenv if you don't already have the Python version specified in Pipfile installed.
+https://github.com/pyenv-win/pyenv-win/blob/master/README.md#installation
+
+Run `pyenv update` to make sure the Python 3.11.6 installer is available (you can check via `pyenv install -l`), then run `pyenv install 3.11.6`. NOTE: do NOT install a version that has a letter in it (e.g. 3.11.6b1), as that may cause version requirement checks to fail.
+
+Also C++ build tools should be installed before installing the pip environment
+
 ```
 cd backend
 # This will populate the Pipfile with package and version information in requirements.txt
 pipenv shell
 # This actually installs the requirements using Pipfile.
- pipenv install
+pipenv install
 ```
+
+If you run into an error about compiled vs installed versions of the numpy API being different, see the docstring [here](https://github.com/numpy/numpy/blob/maintenance/1.26.x/numpy/core/setup_common.py) for a mapping of C API hex to numpy version numbers. Install the version number
+that the error message is complaining a package was compiled against. E.g. `pipenv install numpy==1.23`
 
 #### To run
 
