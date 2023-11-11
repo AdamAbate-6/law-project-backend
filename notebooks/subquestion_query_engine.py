@@ -134,7 +134,7 @@ node_parser = SimpleNodeParser.from_defaults(
                 include_metadata=True,
                 include_prev_next_rel=True,
               )
-llm_predictor = LLMPredictor(llm=OpenAI(temperature=0, model_name="gpt-3.5-turbo", openai_api_key='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'))
+llm_predictor = LLMPredictor(llm=OpenAI(temperature=0, model_name="gpt-3.5-turbo"))
 
 from llama_index.logger import LlamaLogger
 service_context = ServiceContext.from_defaults(chunk_size=1028,

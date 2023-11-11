@@ -4,17 +4,20 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-fastapi = "*"
+fastapi = "==0.101.0"
 uvicorn = "*"
 motor = "*"
-langchain = {extras = ["llms"], version = "*"}
+openai = "*"
 jupyterlab = "*"
 pypdf = "*"
 tiktoken = "*"
 faiss-cpu = "*"
 google-cloud-bigquery = "*"
-llama-index = "*"
+llama-index = "==0.7.19"
 nltk = "*"
+chardet = "*"
+langchain = {extras = ["llms"], version = "==0.0.253"}
+numpy = "==1.23"
 
 [dev-packages]
 
