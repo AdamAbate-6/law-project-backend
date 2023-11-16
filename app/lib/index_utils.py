@@ -11,6 +11,7 @@ from llama_index.storage.index_store import MongoIndexStore
 from llama_index.indices.base import BaseIndex
 
 from lib.database import db_uri
+from lib.llm import service_context
 
 
 extract_keyword_prompt = Prompt(
@@ -79,5 +80,7 @@ def load_index(patent_spif: str) -> BaseIndex:
     storage_context = StorageContext.from_defaults(
         index_store=index_store, docstore=doc_store
     )
-    index = load_index_from_storage(storage_context)
+    index = load_index_from_storage(
+        storage_context, service_context=service_context
+    )
     return index

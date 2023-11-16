@@ -311,7 +311,9 @@ for patent_spif in patent_spifs:
     storage_context = StorageContext.from_defaults(
         index_store=index_store, docstore=doc_store
     )
-    index = load_index_from_storage(storage_context)
+    index = load_index_from_storage(
+        storage_context, service_context=service_context
+    )
     loaded_indices.append(index)
 
 loaded_query_engine_tools = [
@@ -330,12 +332,7 @@ loaded_query_engine = SubQuestionQueryEngine.from_defaults(
     use_async=False,
 )
 
-try:
-    response = loaded_query_engine.query(
-        f"Compare and constrast claim 1 of patent {patent_spifs[0]} with claim 1 "
-        f"of {patent_spifs[1]}"
-    )
-except:
-    import pdb
-
-    pdb.set_trace()
+response = loaded_query_engine.query(
+    f"Compare and constrast claim 1 of patent {patent_spifs[0]} with claim 1 "
+    f"of {patent_spifs[1]}"
+)
